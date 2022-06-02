@@ -6,17 +6,6 @@ use frunk::HNil;
 use once_cell::sync::OnceCell;
 use std::marker::PhantomData;
 
-/// Init is a trait used in [`ServiceProvider`] for create an empty version of `Container`. If you
-/// create your own version of container and you want that it can work with other container like
-/// [`ConvertContainer`], you must implement this trait.
-///
-/// [`ServiceProvider`]: teloc::ServiceProvider
-/// [`ConvertContainer`]: teloc::container::ConvertContainer
-pub trait Container {
-    type Data;
-    fn init(data: Self::Data) -> Self;
-}
-
 /// Trait needed primary to working with `ConvertContainer`. Implement it for your container if you
 /// wish that your container can be placed inside of `ConvertContainer`
 pub trait ResolveContainer<'a, T, Deps> {
@@ -25,10 +14,8 @@ pub trait ResolveContainer<'a, T, Deps> {
 
 #[derive(Debug)]
 pub struct TransientContainer<T>(PhantomData<T>);
-impl<T> Container for TransientContainer<T> {
-    type Data = ();
-
-    fn init(_: ()) -> Self {
+impl<T> TransientContainer<T> {
+    pub fn new() -> Self {
         Self(PhantomData)
     }
 }
@@ -55,11 +42,13 @@ where
 
 #[derive(Debug)]
 pub struct SingletonContainer<T>(OnceCell<T>);
-impl<T> Container for SingletonContainer<T> {
-    type Data = ();
-
-    fn init(_: ()) -> Self {
+impl<T> SingletonContainer<T> {
+    pub fn new() -> Self {
         Self(OnceCell::new())
+    }
+
+    pub fn get(&self) -> &OnceCell<T> {
+        &self.0
     }
 }
 impl<'a, T, Deps> ResolveContainer<'a, &'a T, Deps> for SingletonContainer<T>
@@ -97,20 +86,16 @@ where
         SingletonContainer::resolve_container(self.get(), || self.get_deps())
     }
 }
-impl<T> SingletonContainer<T> {
-    #[inline]
-    pub fn get(&self) -> &OnceCell<T> {
-        &self.0
-    }
-}
 
 #[derive(Debug)]
 pub struct InstanceContainer<T>(T);
-impl<T> Container for InstanceContainer<T> {
-    type Data = T;
-
-    fn init(instance: T) -> Self {
+impl<T> InstanceContainer<T> {
+    pub fn new(instance: T) -> Self {
         Self(instance)
+    }
+
+    pub fn get(&self) -> &T {
+        &self.0
     }
 }
 impl<'a, T> ResolveContainer<'a, &'a T, HNil> for InstanceContainer<T> {
@@ -138,22 +123,15 @@ where
         InstanceContainer::resolve_container(self.get(), || HNil)
     }
 }
-impl<T> InstanceContainer<T> {
-    #[inline]
-    pub fn get(&self) -> &T {
-        &self.0
-    }
-}
 
 pub struct ConvertContainer<Cont, T, U>(Cont, PhantomData<(T, U)>);
-impl<Cont, T, U> Container for ConvertContainer<Cont, T, U>
-where
-    Cont: Container,
-{
-    type Data = Cont::Data;
+impl<Cont, T, U> ConvertContainer<Cont, T, U> {
+    pub fn new(cont: Cont) -> Self {
+        Self(cont, PhantomData)
+    }
 
-    fn init(data: Self::Data) -> Self {
-        Self(Cont::init(data), PhantomData)
+    pub fn get(&self) -> &Cont {
+        &self.0
     }
 }
 impl<'a, Cont, T, U, Deps> ResolveContainer<'a, U, Deps> for ConvertContainer<Cont, T, U>
@@ -178,11 +156,5 @@ where
 {
     fn resolve(&'this self) -> U {
         ConvertContainer::resolve_container(self.get(), || self.get_deps())
-    }
-}
-impl<Cont, ContT, T> ConvertContainer<Cont, ContT, T> {
-    #[inline]
-    pub fn get(&self) -> &Cont {
-        &self.0
     }
 }

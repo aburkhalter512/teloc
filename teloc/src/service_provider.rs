@@ -1,5 +1,5 @@
 use crate::container::{
-    Container, ConvertContainer, InstanceContainer, SingletonContainer, TransientContainer,
+    ConvertContainer, InstanceContainer, SingletonContainer, TransientContainer,
 };
 use crate::index::{ParentIndex, SelfIndex};
 use frunk::hlist::{HList, Selector};
@@ -129,16 +129,13 @@ impl<Parent, Conts: HList> ServiceProvider<Parent, Conts> {
     /// }
     ///
     /// let sp = ServiceProvider::new()
-    ///     ._add::<TransientContainer<Service>>(());
+    ///     .add(TransientContainer::<Service>::new());
     /// ```
-    pub fn _add<Cont: Container>(
-        self,
-        data: Cont::Data,
-    ) -> ServiceProvider<Parent, HCons<Cont, Conts>> {
+    pub fn add<Cont>(self, cont: Cont) -> ServiceProvider<Parent, HCons<Cont, Conts>> {
         let ServiceProvider { parent, containers } = self;
         ServiceProvider {
             parent,
-            containers: containers.prepend(Container::init(data)),
+            containers: containers.prepend(cont),
         }
     }
 
@@ -166,11 +163,8 @@ impl<Parent, Conts: HList> ServiceProvider<Parent, Conts> {
     ///
     /// assert_ne!(s1.uuid, s2.uuid);
     /// ```
-    pub fn add_transient<T>(self) -> ServiceProvider<Parent, HCons<TransientContainer<T>, Conts>>
-    where
-        TransientContainer<T>: Container<Data = ()>,
-    {
-        self._add::<TransientContainer<T>>(())
+    pub fn add_transient<T>(self) -> ServiceProvider<Parent, HCons<TransientContainer<T>, Conts>> {
+        self.add(TransientContainer::new())
     }
 
     /// Add dependency with the `Singleton` lifetime. Singleton services will be created only one
@@ -222,11 +216,8 @@ impl<Parent, Conts: HList> ServiceProvider<Parent, Conts> {
     ///
     /// assert_eq!(s1.uuid, s2.uuid)
     /// ```
-    pub fn add_singleton<T>(self) -> ServiceProvider<Parent, HCons<SingletonContainer<T>, Conts>>
-    where
-        SingletonContainer<T>: Container<Data = ()>,
-    {
-        self._add::<SingletonContainer<T>>(())
+    pub fn add_singleton<T>(self) -> ServiceProvider<Parent, HCons<SingletonContainer<T>, Conts>> {
+        self.add(SingletonContainer::new())
     }
 
     /// Add anything instance to provider. It likes singleton, but it cannot get dependencies from
@@ -264,11 +255,8 @@ impl<Parent, Conts: HList> ServiceProvider<Parent, Conts> {
     pub fn add_instance<T>(
         self,
         data: T,
-    ) -> ServiceProvider<Parent, HCons<InstanceContainer<T>, Conts>>
-    where
-        InstanceContainer<T>: Container<Data = T>,
-    {
-        self._add::<InstanceContainer<T>>(data)
+    ) -> ServiceProvider<Parent, HCons<InstanceContainer<T>, Conts>> {
+        self.add(InstanceContainer::new(data))
     }
 
     /// Same as `ServiceProvider::add_transient`, but can be used for convert one type to another
@@ -319,20 +307,16 @@ impl<Parent, Conts: HList> ServiceProvider<Parent, Conts> {
     pub fn add_transient_c<U, T>(self) -> ContainerTransientAddConvert<Parent, T, U, Conts>
     where
         T: Into<U>,
-        ConvertContainer<TransientContainer<T>, T, U>: Container<Data = ()>,
-        TransientContainer<T>: Container<Data = ()>,
     {
-        self._add::<ConvertContainer<TransientContainer<T>, T, U>>(())
+        self.add(ConvertContainer::<_, T, U>::new(TransientContainer::new()))
     }
 
     /// Same as `Provider::add_transient_c` but for `Singleton` lifetime.
     pub fn add_singleton_c<U, T>(self) -> ContainerSingletonAddConvert<Parent, T, U, Conts>
     where
         T: Into<U>,
-        ConvertContainer<SingletonContainer<T>, T, U>: Container<Data = ()>,
-        SingletonContainer<T>: Container<Data = ()>,
     {
-        self._add::<ConvertContainer<SingletonContainer<T>, T, U>>(())
+        self.add(ConvertContainer::<_, T, U>::new(SingletonContainer::new()))
     }
 
     /// Same as `Provider::add_transient_c` but for `Instance` lifetime.
@@ -342,10 +326,10 @@ impl<Parent, Conts: HList> ServiceProvider<Parent, Conts> {
     ) -> ContainerInstanceAddConvert<Parent, T, U, Conts>
     where
         T: Into<U>,
-        ConvertContainer<InstanceContainer<T>, T, U>: Container<Data = T>,
-        InstanceContainer<T>: Container<Data = T>,
     {
-        self._add::<ConvertContainer<InstanceContainer<T>, T, U>>(instance)
+        self.add(ConvertContainer::<_, T, U>::new(InstanceContainer::new(
+            instance,
+        )))
     }
 }
 
