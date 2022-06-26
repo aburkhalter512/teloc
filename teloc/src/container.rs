@@ -115,6 +115,50 @@ where
     }
 }
 
+pub struct SingletonFactoryContainer<Deps, T, Body>(PhantomData<Deps>, OnceCell<T>, Body);
+impl<Deps, T, Body: Fn(Deps) -> T> SingletonFactoryContainer<Deps, T, Body> {
+    pub fn new(body: Body) -> Self {
+        Self(PhantomData, OnceCell::new(), body)
+    }
+}
+impl<'a, T, Deps, Body: Fn(Deps) -> T> ResolveContainer<'a, &'a T, Deps>
+    for SingletonFactoryContainer<Deps, T, Body>
+{
+    fn resolve_container<F: Fn() -> Deps>(&'a self, get_deps: F) -> &'a T {
+        self.1.get_or_init(|| self.2(get_deps()))
+    }
+}
+impl<'this, 'cont, T, SP, Index, Deps, Body, Infer>
+    Resolver<'this, &'cont SingletonFactoryContainer<Deps, T, Body>, T, (Index, Deps, Infer)> for SP
+where
+    SP: SelectContainer<'this, &'cont SingletonFactoryContainer<Deps, T, Body>, Index>
+        + GetDependencies<'this, Deps, Infer>,
+    SingletonFactoryContainer<Deps, T, Body>: ResolveContainer<'cont, &'cont T, Deps>,
+    T: DependencyClone + 'cont,
+    Body: 'cont,
+    Deps: 'cont,
+{
+    fn resolve(&'this self) -> T {
+        SingletonFactoryContainer::resolve_container(self.get(), || self.get_deps()).clone()
+    }
+}
+
+impl<'this, 'cont, T, SP, Index, Deps, Body, Infer>
+    Resolver<'this, &'cont SingletonFactoryContainer<Deps, T, Body>, &'cont T, (Index, Deps, Infer)>
+    for SP
+where
+    SP: SelectContainer<'this, &'cont SingletonFactoryContainer<Deps, T, Body>, Index>
+        + GetDependencies<'this, Deps, Infer>,
+    SingletonFactoryContainer<Deps, T, Body>: ResolveContainer<'cont, &'cont T, Deps>,
+    T: 'cont,
+    Body: 'cont,
+    Deps: 'cont,
+{
+    fn resolve(&'this self) -> &'cont T {
+        SingletonFactoryContainer::resolve_container(self.get(), || self.get_deps())
+    }
+}
+
 #[derive(Debug)]
 pub struct InstanceContainer<T>(T);
 impl<T> InstanceContainer<T> {

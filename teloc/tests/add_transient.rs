@@ -40,12 +40,16 @@ fn test() {
         .add_transient::<ControllerB>()
         .add_transient::<SchemaA>()
         .add_transient_factory(|deps: HCons<ControllerB, HNil>| -> SchemaB {
-            let (b, rest) = deps.pluck();
+            let (b, _rest) = deps.pluck();
             SchemaB { b }
         });
     let schema: SchemaA = container.resolve();
     assert_eq!(schema.a.service.data, 0);
     assert_eq!(schema.a.service.data2, 1);
+    assert_eq!(schema.b.service.data, 1);
+    assert_eq!(schema.b.service.data2, 5);
+
+    let schema: SchemaB = container.resolve();
     assert_eq!(schema.b.service.data, 1);
     assert_eq!(schema.b.service.data2, 5);
 }

@@ -2,7 +2,7 @@ use crate::container::{
     ConvertContainer, InstanceContainer, SingletonContainer, TransientContainer,
 };
 use crate::index::{ParentIndex, SelfIndex};
-use crate::TransientFactoryContainer;
+use crate::{SingletonFactoryContainer, TransientFactoryContainer};
 use frunk::hlist::{HList, Selector};
 use frunk::{HCons, HNil};
 use std::rc::Rc;
@@ -226,6 +226,13 @@ impl<Parent, Conts: HList> ServiceProvider<Parent, Conts> {
     /// ```
     pub fn add_singleton<T>(self) -> ServiceProvider<Parent, HCons<SingletonContainer<T>, Conts>> {
         self.add(SingletonContainer::new())
+    }
+
+    pub fn add_singleton_factory<Deps, T, Body: Fn(Deps) -> T>(
+        self,
+        body: Body,
+    ) -> ServiceProvider<Parent, HCons<SingletonFactoryContainer<Deps, T, Body>, Conts>> {
+        self.add(SingletonFactoryContainer::new(body))
     }
 
     /// Add anything instance to provider. It likes singleton, but it cannot get dependencies from
