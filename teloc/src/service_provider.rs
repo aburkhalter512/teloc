@@ -2,6 +2,7 @@ use crate::container::{
     ConvertContainer, InstanceContainer, SingletonContainer, TransientContainer,
 };
 use crate::index::{ParentIndex, SelfIndex};
+use crate::TransientFactoryContainer;
 use frunk::hlist::{HList, Selector};
 use frunk::{HCons, HNil};
 use std::rc::Rc;
@@ -165,6 +166,13 @@ impl<Parent, Conts: HList> ServiceProvider<Parent, Conts> {
     /// ```
     pub fn add_transient<T>(self) -> ServiceProvider<Parent, HCons<TransientContainer<T>, Conts>> {
         self.add(TransientContainer::new())
+    }
+
+    pub fn add_transient_factory<Deps, T, Body: Fn(Deps) -> T>(
+        self,
+        body: Body,
+    ) -> ServiceProvider<Parent, HCons<TransientFactoryContainer<Deps, T, Body>, Conts>> {
+        self.add(TransientFactoryContainer::new(body))
     }
 
     /// Add dependency with the `Singleton` lifetime. Singleton services will be created only one

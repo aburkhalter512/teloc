@@ -1,3 +1,4 @@
+use frunk::{HCons, HNil};
 use teloc::{Dependency, Resolver, ServiceProvider};
 
 struct ConstService {
@@ -23,8 +24,12 @@ struct ControllerB {
 }
 
 #[derive(Dependency)]
-struct Schema {
+struct SchemaA {
     a: ControllerA,
+    b: ControllerB,
+}
+
+struct SchemaB {
     b: ControllerB,
 }
 
@@ -33,8 +38,12 @@ fn test() {
     let container = ServiceProvider::new()
         .add_transient::<ControllerA>()
         .add_transient::<ControllerB>()
-        .add_transient::<Schema>();
-    let schema: Schema = container.resolve();
+        .add_transient::<SchemaA>()
+        .add_transient_factory(|deps: HCons<ControllerB, HNil>| -> SchemaB {
+            let (b, rest) = deps.pluck();
+            SchemaB { b }
+        });
+    let schema: SchemaA = container.resolve();
     assert_eq!(schema.a.service.data, 0);
     assert_eq!(schema.a.service.data2, 1);
     assert_eq!(schema.b.service.data, 1);
